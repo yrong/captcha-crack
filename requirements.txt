@@ -1,1 +1,2 @@
 Pillow==5.2.0
+PyAutoGUI==0.9.50
