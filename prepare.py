@@ -1,33 +1,74 @@
-import pandas as pd
-import numpy as np
-import cv2
-import glob
-import imutils
-from imutils import paths
+from PIL import Image
+import requests
+from io import BytesIO
+import time
 import os
-import os.path
+from pathlib import Path
+import re
+import pyautogui
 
-ADD_CAPTCHA_FOLDER = "data/add"
+pwd = os.path.dirname(Path(__file__).resolve())
+dataPath = pwd + '/data'
 
-data = []
-labels = []
-for image in paths.list_images(ADD_CAPTCHA_FOLDER):
-    img = cv2.imread(image)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    img = cv2.resize(img, (30, 30))
+operatorDict = {
+        "+": "add",
+        "-": "sub",
+        "*": "mul"
+    }
 
-    # adding a 3rd dimension to the image
-    img = np.expand_dims(img, axis=2)
+def mkdir():
+    if not os.path.exists(dataPath):
+        os.mkdir(dataPath, 0o755)
+    for num in range(10):
+        path = dataPath + '/' + str(num)
+        if not os.path.exists(path):
+            os.mkdir(path, 0o755)
+    for operator in ['add', 'sub', 'mul']:
+        path = dataPath + '/' + str(operator)
+        if not os.path.exists(path):
+            os.mkdir(path, 0o755)
 
-    # grabing the name of the letter based on the folder it is present in
-    label = image.split(os.path.sep)[-2]
 
-    # appending to the empty lists
-    data.append(img)
-    labels.append(label)
+def label():
+    # Opens a image in RGB mode
+    response = requests.get('https://www.yooli.com/secure/verifyCode.jsp')
+    im = Image.open(BytesIO(response.content))
+    im.show()
+    width, height = im.size
 
-# converting data and labels to np array
-data = np.array(data, dtype="float")
-labels = np.array(labels)
+    # ask for input
+    time.sleep(0.2)
+    pyautogui.keyDown('alt')
+    pyautogui.press('tab')
+    pyautogui.keyUp('alt')
+    val1 = input("first number from 0-9:")
+    assert val1.isdigit()
+    operator = input("operator from +/-/*:")
+    assert re.match(r"\+|\-|\*", operator)
+    operator = operatorDict[operator]
+    val2 = input("second number from 0-9:")
+    assert val2.isdigit()
 
-print(data.shape, labels.shape)
+    # Cropped image of above dimension
+    im0 = im.crop((0, 0, 48, height))
+    # Shows the image in image viewer
+    # im0.show()
+    t = str(int(round(time.time() * 1000)))
+    im0.save(dataPath + '/' + val1 + '/' + t + '.png')
+
+    im1 = im.crop((48, 0, 112, height))
+    # Shows the image in image viewer
+    # im1.show()
+    t = str(int(round(time.time() * 1000)))
+    im1.save(dataPath + '/' + operator + '/' + t + '.png')
+
+    im2 = im.crop((112, 0, 150, height))
+    # Shows the image in image viewer
+    # im2.show()
+    t = str(int(round(time.time() * 1000)))
+    im2.save(dataPath + '/' + val2 + '/' + t + '.png')
+
+if __name__ == "__main__":
+    mkdir()
+    for num in range(10000):
+        label()
