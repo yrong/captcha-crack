@@ -1,2 +1,5 @@
-Pillow==5.2.0
+Pillow==6.2.1
 PyAutoGUI==0.9.50
+requests==2.23.0
+opencv-python==4.2.0.34
+imutils==0.5.3
