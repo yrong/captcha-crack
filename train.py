@@ -1,15 +1,13 @@
-import pandas as pd
 import numpy as np
 import cv2
-import glob
-import imutils
 from imutils import paths
-import os
 import os.path
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelBinarizer
+import pickle
 
 data = []
 labels = []
-
 operatorDict = {
         "add": 0,
         "sub": 1,
@@ -45,21 +43,18 @@ print(data.shape, labels.shape)
 
 data = data/255.0
 
-from sklearn.model_selection import train_test_split
-(train_x, val_x, train_y, val_y) = train_test_split(data, labels, test_size=0.2, random_state=0)
-print(train_x.shape, val_x.shape, train_y.shape, val_y.shape)
+(train_x, test_x, train_y, test_y) = train_test_split(data, labels, test_size=0.1, random_state=0)
+print(train_x.shape, test_x.shape, train_y.shape, test_y.shape)
 
-from sklearn.preprocessing import LabelBinarizer
-import pickle
 lb = LabelBinarizer().fit(train_y)
 train_y = lb.transform(train_y)
-val_y = lb.transform(val_y)
+test_y = lb.transform(test_y)
 
-bin = pickle.dumps(lb)
+# bin = pickle.dumps(lb)
 with open("captcha_labels.pickle", "wb") as f:
     pickle.dump(lb, f)
 
-print(train_y.shape, val_y.shape)
+print(train_y.shape, test_y.shape)
 
 from keras.models import Sequential
 from keras.layers.convolutional import Conv2D, MaxPooling2D
@@ -79,15 +74,15 @@ model.add(Dense(3, activation="softmax"))
 model.compile(loss="categorical_crossentropy", optimizer="adam", metrics=["accuracy"])
 model.summary()
 estop = EarlyStopping(patience=10, mode='min', min_delta=0.01, monitor='val_loss')
-model.fit(train_x, train_y, validation_data=(val_x, val_y), batch_size=10, epochs=50, verbose=1, callbacks = [estop])
+model.fit(train_x, train_y, validation_data=(test_x, test_y), batch_size=5, epochs=30, verbose=1, callbacks = [estop])
 
+scores = model.evaluate(train_x, train_y, verbose=0)
+print("%s: %.2f%%" % (model.metrics_names[1], scores[1] * 100))
 
-# test
-operator_image = cv2.imread('data/mul/1586508146362.png')
-operator_image = cv2.cvtColor(operator_image, cv2.COLOR_BGR2GRAY)
-operator_image = cv2.resize(operator_image, (30, 30))
-operator_image = np.expand_dims(operator_image, axis=2)
-operator_image = np.expand_dims(operator_image, axis=0)
-pred = model.predict(operator_image)
-operator = lb.inverse_transform(pred)[0]
-print("CAPTCHA operator is: {}".format(operator))
+# serialize model to JSON
+model_json = model.to_json()
+with open("model.json", "w") as json_file:
+    json_file.write(model_json)
+# serialize weights to HDF5
+model.save_weights("model.h5")
+print("Saved model to disk")
